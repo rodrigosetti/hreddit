@@ -1,4 +1,7 @@
-module System.Console.CommandLoop where
+module System.Console.CommandLoop ( CommandFunction(..),
+                                    Command(..),
+                                    evalExecuteLoop,
+                                    cmdHelp ) where
 
 import Control.Monad.State
 import System.Console.Readline
@@ -36,36 +39,37 @@ evalExecuteLoop commands = evalStateT loop
 --   not exist, is ambiguous or the argument number is more than necessary.
 performCommand :: [Command c] -> String -> [String] -> StateT c IO Bool
 performCommand commands commandName args =
-    case length cmds of
-        0 -> do lift $ putStrLn $ "unknown command \"" ++ commandName ++ "\""
-                return False
-        1 -> do let cmd = head cmds
-                    argNum = argumentNumber cmd
-                when (length args > argNum) $
-                     lift $ putStrLn $ "warning: \"" ++ commandName ++ "\" takes at most " ++ show argNum ++ " arguments."
-                function cmd args
-        _ -> do lift $ putStrLn $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
-                return False
-  where
-    cmds = matchedCommands commands commandName
+    do maybeCommand <- lift $ getCommand commands commandName
+       case maybeCommand of
+           Just cmd -> do let argNum = argumentNumber cmd
+                          when (length args > argNum) $
+                               lift $ putStrLn $ "warning: \"" ++ commandName ++ "\" takes at most " ++ show argNum ++ " arguments."
+                          function cmd args
+           Nothing -> return False
 
--- | Return all the commands matched by the command name prefix
-matchedCommands :: [Command c] -> String -> [Command c]
-matchedCommands commands commandName = filter (isPrefixOf commandName . cmdName) commands
-
+-- | Displays help information about a single command or all commands
 cmdHelp :: [Command c] -> CommandFunction c
 cmdHelp commands (commandName:_) = 
-    case length cmds of
-        0 -> do lift $ putStrLn $ "unknown command \"" ++ commandName ++ "\"."
-                return False
-        1 -> do let cmd = head cmds
-                lift $ printCommandInfo cmd
-                return True
-        _ -> do lift $ putStrLn $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
-                return False
-  where
-    cmds = matchedCommands commands commandName
+    do maybeCommand <- lift $ getCommand commands commandName
+       case maybeCommand of
+           Just cmd -> do lift $ printCommandInfo cmd
+                          return True
+           Nothing -> return False
 cmdHelp commands [] = lift $ forM_ commands printCommandInfo >> return True
+
+
+-- | get the matched command, or return Nothing - displaying error
+--   if the command is ambiguous or unknown
+getCommand :: [Command c] -> String -> IO (Maybe (Command c))
+getCommand commands commandName = 
+    case length cmds of
+        0 -> do putStrLn $ "unknown command \"" ++ commandName ++ "\"."
+                return Nothing
+        1 -> return $ Just $ head cmds
+        _ -> do putStrLn $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
+                return Nothing
+  where
+    cmds = filter (isPrefixOf commandName . cmdName) commands
 
 -- | Print information about the command
 printCommandInfo :: Command c -> IO ()
