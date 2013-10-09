@@ -21,4 +21,10 @@ executable hreddit
   exposed-modules:   System.Console.CommandLoop
   build-depends:     base ==4.5.*,
                      readline ==1.*,
-                     mtl ==2.*
+                     mtl ==2.*,
+                     network==2.*,
+                     HTTP==4000.2.*,
+                     bytestring==0.9.*,
+                     aeson==0.6.*
+
+

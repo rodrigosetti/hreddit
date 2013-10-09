@@ -1,18 +1,10 @@
 module Main where
 
-import System.Console.CommandLoop
-import System.Exit
 import Control.Monad (forM_)
 import Control.Monad.Trans (lift)
-
--- | One of the possible sorting for a subreddit
-data Sorting = Hot | New | Top | Controversial
-
--- | A link thing
-data Link = Link { domain :: String,
-                   name   :: String,
-                   title  :: String,
-                   url    :: String }
+import Network.Reddit
+import System.Console.CommandLoop
+import System.Exit
 
 -- | The application's context state
 data RedditContext = RedditContext { subreddit :: Maybe String,
@@ -31,6 +23,8 @@ redditCommands = [Command 0 "quit"          cmdQuit
                           "Go to previous page and list",
                   Command 0 "first"         cmdFirstPage
                           "Go to first page and list",
+                  Command 1 "subreddit"     cmdSubreddit
+                          "Change or show subredit",
                   Command 0 "hot"           cmdSortingHot
                           "Go to the \"hot\" sorting",
                   Command 0 "new"           cmdSortingNew
@@ -56,9 +50,7 @@ redditCommands = [Command 0 "quit"          cmdQuit
   
 -- | loads initial context and start the evaluation loop
 main :: IO ()
-main = do
-    initialContext <- loadInitialContext
-    evalExecuteLoop redditCommands initialContext
+main = loadInitialContext >>= evalExecuteLoop redditCommands
 
 -- | Loads the initial context. Try to get from a history file, or creates a
 --   default one
@@ -106,4 +98,7 @@ cmdList _ = return True
 
 cmdPageSize :: CommandFunction RedditContext
 cmdPageSize _ = return True
+
+cmdSubreddit :: CommandFunction RedditContext
+cmdSubreddit _ = return True
 
