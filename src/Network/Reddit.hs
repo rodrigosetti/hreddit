@@ -1,22 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Reddit where
+module Network.Reddit (Sorting(..),
+                       Page(..),
+                       Link(domain, name, title, url),
+                       Listing(..),
+                       listing) where
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad (mzero, liftM)
+import Control.Monad.Error
 import Data.Aeson hiding (Result)
 import Data.ByteString.Lazy hiding (elem, find, map, intersperse)
 import Network.HTTP
 import Network.HTTP.Utils
-import Network.Stream
 import Network.URI
 import Prelude hiding (concat)
-
---import Debug.Trace (trace)
 
 -- | One of the possible sorting for a subreddit
 data Sorting = Hot | New | Top | Controversial deriving Show
 
--- | A link thing
+-- | Pagination values
+data Page = First | Before String | After String
+
+-- | A Link thing
 data Link = Link { domain :: String,
                    name   :: String,
                    title  :: String,
@@ -38,7 +42,7 @@ instance FromJSON Listing where
     parseJSON _          = mzero
 
 
--- | A Reddit API request
+-- | A (internal) Reddit API request constructor
 request :: RequestMethod -> String -> String -> Request ByteString
 request method requestPath queryString =
     Request { rqURI = uri ,
@@ -52,17 +56,19 @@ request method requestPath queryString =
               requestPath
               queryString
               ""
-listing :: Maybe String -> Maybe (Either String String) -> Sorting -> Int -> IO (Either String Listing)
-listing maybeSubreddit maybeBeforeOrAfter sorting limit =
+
+-- | Get a page of Reddit listing
+listing :: Maybe String -> Page -> Sorting -> Int -> ErrorT String IO Listing
+listing maybeSubreddit page sorting limit =
     jsonAPICall $ request GET (subreddit ++ sortingString ++ ".json") $
                        makeQuery $ ("limit", show $ restrict 0 100 limit):otherQueryParams
   where
     restrict a b = max a . min b
     subreddit = maybe "/" (\n -> "/r/" ++ n ++ "/") maybeSubreddit
-    otherQueryParams = case maybeBeforeOrAfter of
-                            Nothing -> []
-                            Just (Left fullname) -> [("before", fullname)]
-                            Just (Right fullname) -> [("after", fullname)]
+    otherQueryParams = case page of
+                            First -> []
+                            Before fullname -> [("before", fullname)]
+                            After fullname -> [("after", fullname)]
     sortingString = case sorting of
                         Hot -> "hot"
                         New -> "new"

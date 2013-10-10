@@ -42,7 +42,7 @@ redditCommands = [Command 0 "quit"          cmdQuit
 
 -- | loads initial context and start the evaluation loop
 main :: IO ()
-main = loadInitialContext >>= evalExecuteLoop redditCommands (load Nothing)
+main = loadInitialContext >>= evalExecuteLoop redditCommands (load First)
 
 -- | Loads the initial context. Try to get from a history file, or creates a
 --   default one
@@ -56,46 +56,46 @@ cmdNextPage :: [String] -> CommandAction RedditContext
 cmdNextPage _ =
     lift get >>= loadNext . links >> cmdList []
   where
-    loadNext [] = throwError "ERROR: could not go to next page from empty page"
-    loadNext l = load $  Just $ Right $ name $ last l
+    loadNext [] = throwError "could not go to next page from empty page"
+    loadNext l = load $ After $ name $ last l
 
 cmdPreviousPage :: [String] -> CommandAction RedditContext
 cmdPreviousPage _ =
     lift get >>= loadPrev . links >> cmdList []
   where
-    loadPrev [] = throwError "ERROR: could not go to previous page from empty page"
-    loadPrev (x:_) = load $  Just $ Left $ name x
+    loadPrev [] = throwError "could not go to previous page from empty page"
+    loadPrev (x:_) = load $ Before $ name x
 
 cmdFirstPage :: [String] -> CommandAction RedditContext
-cmdFirstPage _ = load Nothing >> cmdList []
+cmdFirstPage _ = load First >> cmdList []
 
 cmdSortingHot :: [String] -> CommandAction RedditContext
-cmdSortingHot _ = lift (modify (\c -> c {sorting = Hot})) >> load Nothing >> cmdList []
+cmdSortingHot _ = lift (modify (\c -> c {sorting = Hot})) >> load First >> cmdList []
 
 cmdSortingNew :: [String] -> CommandAction RedditContext
-cmdSortingNew _ = lift (modify (\c -> c {sorting = New})) >> load Nothing >> cmdList []
+cmdSortingNew _ = lift (modify (\c -> c {sorting = New})) >> load First >> cmdList []
 
 cmdSortingTop :: [String] -> CommandAction RedditContext
-cmdSortingTop _ = lift (modify (\c -> c {sorting = Top})) >> load Nothing >> cmdList []
+cmdSortingTop _ = lift (modify (\c -> c {sorting = Top})) >> load First >> cmdList []
 
 cmdSortingControversial :: [String] -> CommandAction RedditContext
-cmdSortingControversial _ = lift (modify (\c -> c {sorting = Controversial})) >> load Nothing >> cmdList []
+cmdSortingControversial _ = lift (modify (\c -> c {sorting = Controversial})) >> load First >> cmdList []
 
 cmdPageSize :: [String] -> CommandAction RedditContext
 cmdPageSize (x:_) = lift (modify (\c -> c {pageSize = read x}))
 cmdPageSize [] = lift get >>= liftIO . print . pageSize
 
 cmdSubreddit :: [String] -> CommandAction RedditContext
-cmdSubreddit (x:_) = lift (modify (\c -> c {subreddit = Just x})) >> load Nothing >> cmdList []
+cmdSubreddit (x:_) = lift (modify (\c -> c {subreddit = Just x})) >> load First >> cmdList []
 cmdSubreddit [] = lift get >>= liftIO . putStrLn . fromMaybe "<no subreddit>" . subreddit
 
 cmdList :: [String] -> CommandAction RedditContext
 cmdList _ =
     do ctx <- lift get
        let headerDesc = fromMaybe "" (subreddit ctx) ++ "/" ++ show (sorting ctx)
-       liftIO $ putStrLn headerDesc
-       liftIO $ putStrLn $ replicate (length headerDesc) '='
-       liftIO $ printLinks $ links ctx
+       liftIO $ do putStrLn headerDesc
+                   putStrLn $ replicate (length headerDesc) '='
+                   printLinks $ links ctx
   where
     printLinks [] = return ()
     printLinks (l:ls) = do putStrLn $ title l
@@ -103,11 +103,8 @@ cmdList _ =
                            putStrLn ""
                            printLinks ls
 
-load :: Maybe (Either String String) -> CommandAction RedditContext
-load maybeBeforeOrAfter =
-    do ctx <- lift get
-       eitherListing <- liftIO $ listing (subreddit ctx) maybeBeforeOrAfter (sorting ctx) (pageSize ctx)
-       case eitherListing of
-         Left msg -> throwError msg
-         Right (Listing ls) -> lift $ modify (\c -> c { links = ls })
+load :: Page -> CommandAction RedditContext
+load page = do ctx <- lift get
+               liftIO (runErrorT $ listing (subreddit ctx) page (sorting ctx) $ pageSize ctx) >>=
+                either throwError (\(Listing ls) -> lift $ modify $ \c -> c { links = ls })
 

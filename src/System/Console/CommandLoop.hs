@@ -5,9 +5,12 @@ module System.Console.CommandLoop ( CommandAction,
 
 import Control.Monad.Error
 import Control.Monad.State
-import System.Console.Readline
 import Data.List (isPrefixOf)
+import System.Console.Readline
 
+-- | A command action is a contextualized action that can fail and perform IO,
+--   therefore it's an IO monad wrapped in a State transformer, wrapped in an
+--   Error transformer.
 type CommandAction s = ErrorT String (StateT s IO) ()
 
 -- | A command is basically an annotated function with name, description and
@@ -18,8 +21,8 @@ data Command c = Command { argumentNumber :: Int,
                            description :: String }
 
 
--- | The evaluation loop reads a user command and perform it
---
+-- | The evaluation loop reads a user command and performs it, repeating until
+--   it reads the end of input.
 evalExecuteLoop :: [Command c] -> CommandAction c -> c -> IO ()
 evalExecuteLoop commands start =
     evalStateT $ runErrorT start >> loop
@@ -29,12 +32,10 @@ evalExecuteLoop commands start =
         case maybeCommand of
             Nothing -> return ()
             Just "" -> loop
-            Just command -> do let ws = words command
-                               result <- runErrorT $ performCommand commands (head ws) $ tail ws
-                               case result of
-                                   Left e -> liftIO $ putStrLn e
-                                   Right _ -> liftIO $ addHistory command
-                               loop
+            Just command -> let ws = words command in
+                             runErrorT (performCommand commands (head ws) $ tail ws) >>=
+                             liftIO . either (putStrLn . (++) "ERROR: ") (\_ -> addHistory command) >>
+                             loop
 
 -- | Select the command to run from the available ones. Smartly selects the
 --   unique prefix, if exist, and show errors and warnings if the command does
@@ -60,9 +61,9 @@ cmdHelp commands [] = liftIO $ forM_ commands printCommandInfo
 getCommand :: [Command c] -> String -> ErrorT String (StateT c IO) (Command c)
 getCommand commands commandName = 
     case length cmds of
-        0 -> do throwError $ "unknown command \"" ++ commandName ++ "\"."
+        0 -> throwError $ "unknown command \"" ++ commandName ++ "\"."
         1 -> return $ head cmds
-        _ -> do throwError $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
+        _ -> throwError $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
   where
     cmds = filter (isPrefixOf commandName . cmdName) commands
 
