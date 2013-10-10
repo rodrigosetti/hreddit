@@ -14,7 +14,7 @@ import Prelude hiding (concat)
 --import Debug.Trace (trace)
 
 -- | One of the possible sorting for a subreddit
-data Sorting = Hot | New | Top | Controversial
+data Sorting = Hot | New | Top | Controversial deriving Show
 
 -- | A link thing
 data Link = Link { domain :: String,
