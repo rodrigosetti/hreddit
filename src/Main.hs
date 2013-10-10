@@ -1,7 +1,6 @@
 module Main where
 
-import Control.Monad (forM_)
-import Control.Monad.Trans (lift)
+import Control.Monad.Error
 import Control.Monad.State
 import Data.Maybe (fromMaybe)
 import Network.Reddit
@@ -40,59 +39,63 @@ redditCommands = [Command 0 "quit"          cmdQuit
                           "Set or display the current page size",
                   Command 0 "list"          cmdList
                           "List current page"]
-  
+
 -- | loads initial context and start the evaluation loop
 main :: IO ()
-main = loadInitialContext >>= evalExecuteLoop redditCommands
+main = loadInitialContext >>= evalExecuteLoop redditCommands (load Nothing)
 
 -- | Loads the initial context. Try to get from a history file, or creates a
 --   default one
 loadInitialContext :: IO RedditContext
 loadInitialContext = return $ RedditContext Nothing 12 New []
 
-cmdQuit :: CommandFunction RedditContext
-cmdQuit _ = lift exitSuccess
+cmdQuit :: [String] -> CommandAction RedditContext
+cmdQuit _ = liftIO exitSuccess
 
-cmdNextPage :: CommandFunction RedditContext
-cmdNextPage _ = return True
+cmdNextPage :: [String] -> CommandAction RedditContext
+cmdNextPage _ =
+    lift get >>= loadNext . links >> cmdList []
+  where
+    loadNext [] = throwError "ERROR: could not go to next page from empty page"
+    loadNext l = load $  Just $ Right $ name $ last l
 
-cmdPreviousPage :: CommandFunction RedditContext
-cmdPreviousPage _ = return True
+cmdPreviousPage :: [String] -> CommandAction RedditContext
+cmdPreviousPage _ =
+    lift get >>= loadPrev . links >> cmdList []
+  where
+    loadPrev [] = throwError "ERROR: could not go to previous page from empty page"
+    loadPrev (x:_) = load $  Just $ Left $ name x
 
-cmdFirstPage :: CommandFunction RedditContext
+cmdFirstPage :: [String] -> CommandAction RedditContext
 cmdFirstPage _ = load Nothing >> cmdList []
 
-cmdSortingHot :: CommandFunction RedditContext
-cmdSortingHot _ = modify (\c -> c {sorting = Hot}) >> load Nothing >> cmdList []
+cmdSortingHot :: [String] -> CommandAction RedditContext
+cmdSortingHot _ = lift (modify (\c -> c {sorting = Hot})) >> load Nothing >> cmdList []
 
-cmdSortingNew :: CommandFunction RedditContext
-cmdSortingNew _ = modify (\c -> c {sorting = New}) >> load Nothing >> cmdList []
+cmdSortingNew :: [String] -> CommandAction RedditContext
+cmdSortingNew _ = lift (modify (\c -> c {sorting = New})) >> load Nothing >> cmdList []
 
-cmdSortingTop :: CommandFunction RedditContext
-cmdSortingTop _ = modify (\c -> c {sorting = Top}) >> load Nothing >> cmdList []
+cmdSortingTop :: [String] -> CommandAction RedditContext
+cmdSortingTop _ = lift (modify (\c -> c {sorting = Top})) >> load Nothing >> cmdList []
 
-cmdSortingControversial :: CommandFunction RedditContext
-cmdSortingControversial _ = modify (\c -> c {sorting = Controversial}) >> load Nothing >> cmdList []
+cmdSortingControversial :: [String] -> CommandAction RedditContext
+cmdSortingControversial _ = lift (modify (\c -> c {sorting = Controversial})) >> load Nothing >> cmdList []
 
-cmdPageSize :: CommandFunction RedditContext
-cmdPageSize (x:_) = modify (\c -> c {pageSize = read x}) >> return True
-cmdPageSize [] = do ctx <- get
-                    lift $ print $ pageSize ctx
-                    return True
+cmdPageSize :: [String] -> CommandAction RedditContext
+cmdPageSize (x:_) = lift (modify (\c -> c {pageSize = read x}))
+cmdPageSize [] = lift get >>= liftIO . print . pageSize
 
-cmdSubreddit :: CommandFunction RedditContext
-cmdSubreddit (x:_) = modify (\c -> c {subreddit = Just x}) >> load Nothing >> cmdList []
-cmdSubreddit [] = do ctx <- get
-                     lift $ putStrLn $ fromMaybe "<no subreddit>" $ subreddit ctx
-                     return True
+cmdSubreddit :: [String] -> CommandAction RedditContext
+cmdSubreddit (x:_) = lift (modify (\c -> c {subreddit = Just x})) >> load Nothing >> cmdList []
+cmdSubreddit [] = lift get >>= liftIO . putStrLn . fromMaybe "<no subreddit>" . subreddit
 
-cmdList :: CommandFunction RedditContext
+cmdList :: [String] -> CommandAction RedditContext
 cmdList _ =
-    do ctx <- get
-       lift $ putStrLn $ (fromMaybe "" $ subreddit ctx) ++ "/" ++ show (sorting ctx)
-       lift $ putStrLn "------------------"
-       lift $ printLinks $ links ctx
-       return True
+    do ctx <- lift get
+       let headerDesc = fromMaybe "" (subreddit ctx) ++ "/" ++ show (sorting ctx)
+       liftIO $ putStrLn headerDesc
+       liftIO $ putStrLn $ replicate (length headerDesc) '='
+       liftIO $ printLinks $ links ctx
   where
     printLinks [] = return ()
     printLinks (l:ls) = do putStrLn $ title l
@@ -100,12 +103,11 @@ cmdList _ =
                            putStrLn ""
                            printLinks ls
 
-load :: Maybe (Either String String) -> StateT RedditContext IO Bool
+load :: Maybe (Either String String) -> CommandAction RedditContext
 load maybeBeforeOrAfter =
-    do ctx <- get
-       eitherListing <- lift $ listing (subreddit ctx) maybeBeforeOrAfter (sorting ctx) (pageSize ctx)
+    do ctx <- lift get
+       eitherListing <- liftIO $ listing (subreddit ctx) maybeBeforeOrAfter (sorting ctx) (pageSize ctx)
        case eitherListing of
-         Left msg -> lift $ putStrLn msg >> return False
-         Right (Listing ls) -> do modify (\c -> c { links = ls })
-                                  return True
+         Left msg -> throwError msg
+         Right (Listing ls) -> lift $ modify (\c -> c { links = ls })
 

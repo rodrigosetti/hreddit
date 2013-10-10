@@ -1,0 +1,10 @@
+
+ * Command line initialization: [<subreddit>]/[new|hot|controversial|top]
+ * When changing subreddit, display subreddit information
+ * Suggest command if user entered a typo (a la git)
+ * Save command history across sessions
+ * Authentication
+    - login
+    - vote up/down
+    - save user cookie across sessions
+
