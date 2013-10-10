@@ -12,11 +12,8 @@ List of commands:
  * `new`: Go to the "new" sorting
  * `top`: Go to the "top" sorting
  * `controversial`: Go to the "controversial" sorting
- * `login`: Login with user name
- * `logout`: Logs out
+ * `subreddit`: Change or show current subreddit
  * `help`: Display help about a command or all commands
  * `page`: Set or display the current page size
- * `up`: Vote a link number up
- * `down`: Vote a link number down
  * `list`: List current page
 

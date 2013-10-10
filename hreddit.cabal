@@ -14,11 +14,15 @@ maintainer:          rodrigosetti@gmail.com
 category:            Web
 build-type:          Simple
 cabal-version:       >=1.8
+ghc-options:         -Wall
 
 executable hreddit
   hs-source-dirs:    src
   main-is:           Main.hs
-  exposed-modules:   System.Console.CommandLoop
+  exposed-modules:   System.Console.CommandLoop,
+                     Network.Reddit,
+                     Network.HTTP.Utils
+
   build-depends:     base ==4.5.*,
                      readline ==1.*,
                      mtl ==2.*,

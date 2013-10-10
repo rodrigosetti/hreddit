@@ -8,10 +8,9 @@ import System.Exit
 
 -- | The application's context state
 data RedditContext = RedditContext { subreddit :: Maybe String,
-                         username  :: Maybe String,
-                         pageSize  :: Int,
-                         sorting   :: Sorting,
-                         links     :: [Link] }
+                                     pageSize  :: Int,
+                                     sorting   :: Maybe Sorting,
+                                     links     :: [Link] }
 
 -- | The full list of commands available for the user
 redditCommands :: [Command RedditContext]
@@ -33,18 +32,10 @@ redditCommands = [Command 0 "quit"          cmdQuit
                           "Go to the \"top\" sorting",
                   Command 0 "controversial" cmdSortingControversial
                           "Go to the \"controversial\" sorting",
-                  Command 1 "login"         cmdLogIn
-                          "Login with user name",
-                  Command 0 "logout"        cmdLogOut
-                          "Logs out",
                   Command 1 "help"          (cmdHelp redditCommands)
                           "Display help about a command or all commands",
                   Command 1 "page"          cmdPageSize
                           "Set or display the current page size",
-                  Command 1 "up"            cmdVoteUp
-                          "Vote a link number up",
-                  Command 1 "down"          cmdVoteDown
-                          "Vote a link number down",
                   Command 0 "list"          cmdList
                           "List current page"]
   
@@ -55,7 +46,7 @@ main = loadInitialContext >>= evalExecuteLoop redditCommands
 -- | Loads the initial context. Try to get from a history file, or creates a
 --   default one
 loadInitialContext :: IO RedditContext
-loadInitialContext = return $ RedditContext Nothing Nothing 12 New []
+loadInitialContext = return $ RedditContext Nothing 12 Nothing []
 
 cmdQuit :: CommandFunction RedditContext
 cmdQuit _ = lift exitSuccess
@@ -80,18 +71,6 @@ cmdSortingTop _ = return True
 
 cmdSortingControversial :: CommandFunction RedditContext
 cmdSortingControversial _ = return True
-
-cmdLogIn :: CommandFunction RedditContext
-cmdLogIn _ = return True
-
-cmdLogOut :: CommandFunction RedditContext
-cmdLogOut _ = return True
-
-cmdVoteUp :: CommandFunction RedditContext
-cmdVoteUp _ = return True
-
-cmdVoteDown :: CommandFunction RedditContext
-cmdVoteDown _ = return True
 
 cmdList :: CommandFunction RedditContext
 cmdList _ = return True
