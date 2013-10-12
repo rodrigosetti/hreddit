@@ -6,11 +6,13 @@ import Data.Maybe (fromMaybe)
 import Network.Reddit
 import System.Console.CommandLoop
 import System.Exit
+import Data.List (isPrefixOf)
+import Data.Char (toLower)
 
 -- | The application's context state
 data RedditContext = RedditContext { subreddit :: Maybe String,
                                      pageSize  :: Int,
-                                     sorting   :: Sorting,
+				      sorting   :: Sorting,
                                      links     :: [Link] }
 
 -- | The full list of commands available for the user
@@ -48,6 +50,17 @@ main = loadInitialContext >>= evalExecuteLoop redditCommands (load First)
 --   default one
 loadInitialContext :: IO RedditContext
 loadInitialContext = return $ RedditContext Nothing 12 New []
+
+instance Read Sorting where
+	readsPrec _ str =
+		case match (map toLower str) of
+			(x:_) -> [(x, "")]
+			_	-> [(Hot, "")]
+		where
+			values = [("hot", Hot), ("new", New),
+				("top", Top), ("controversial",Controversial)]
+			match :: String -> [Sorting]
+			match value = map snd $ filter (isPrefixOf value . fst) values
 
 cmdQuit :: [String] -> CommandAction RedditContext
 cmdQuit _ = liftIO exitSuccess
