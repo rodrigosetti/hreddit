@@ -8,14 +8,27 @@ module Network.Reddit (Sorting(..),
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Error
 import Data.Aeson hiding (Result)
-import Data.ByteString.Lazy hiding (elem, find, map, intersperse)
+import Data.ByteString.Lazy hiding (elem, find, map, intersperse, filter, isPrefixOf)
 import Network.HTTP
 import Network.HTTP.Utils
 import Network.URI
 import Prelude hiding (concat)
+import Data.Char (toLower)
+import Data.List (isPrefixOf)
 
 -- | One of the possible sorting for a subreddit
 data Sorting = Hot | New | Top | Controversial deriving Show
+
+instance Read Sorting where
+	readsPrec _ str =
+		case match (map toLower str) of
+			(x:_)   -> [(x, "")]
+			_       -> [(Hot, "")]
+		where
+		        values = [("hot", Hot), ("new", New),
+				("top", Top), ("controversial",Controversial)]
+			match :: String -> [Sorting]
+			match value = map snd $ filter (isPrefixOf value . fst) values
 
 -- | Pagination values
 data Page = First | Before String | After String

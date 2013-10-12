@@ -6,8 +6,6 @@ import Data.Maybe (fromMaybe)
 import Network.Reddit
 import System.Console.CommandLoop
 import System.Exit
-import Data.List (isPrefixOf)
-import Data.Char (toLower)
 import System.Environment (getArgs)
 
 -- | The application's context state
@@ -54,7 +52,8 @@ loadInitialContext = cmdArgsContext =<< defaultContext
     where 
         defaultContext :: IO RedditContext
         defaultContext = return $ RedditContext Nothing 12 New []
-        cmdArgsContext :: (RedditContext -> IO RedditContext)
+
+        cmdArgsContext :: RedditContext -> IO RedditContext
         cmdArgsContext ctx = do
             (sbrdt, srtng) <- fmap parseArgs getArgs
             return $ ctx {subreddit = sbrdt, sorting = srtng}
@@ -66,17 +65,6 @@ loadInitialContext = cmdArgsContext =<< defaultContext
                             sr = takeWhile ('/' /=) arg
                             s  = drop ((length sr) + 1) arg
                     parseArgs _ = (subreddit ctx, sorting ctx)
-
-instance Read Sorting where
-	readsPrec _ str =
-		case match (map toLower str) of
-			(x:_)   -> [(x, "")]
-			_       -> [(Hot, "")]
-		where
-		        values = [("hot", Hot), ("new", New),
-				("top", Top), ("controversial",Controversial)]
-			match :: String -> [Sorting]
-			match value = map snd $ filter (isPrefixOf value . fst) values
 
 cmdQuit :: [String] -> CommandAction RedditContext
 cmdQuit _ = liftIO exitSuccess
