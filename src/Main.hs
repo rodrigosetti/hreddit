@@ -8,11 +8,12 @@ import System.Console.CommandLoop
 import System.Exit
 import Data.List (isPrefixOf)
 import Data.Char (toLower)
+import System.Environment (getArgs)
 
 -- | The application's context state
 data RedditContext = RedditContext { subreddit :: Maybe String,
                                      pageSize  :: Int,
-				      sorting   :: Sorting,
+                                     sorting   :: Sorting,
                                      links     :: [Link] }
 
 -- | The full list of commands available for the user
@@ -46,18 +47,33 @@ redditCommands = [Command 0 "quit"          cmdQuit
 main :: IO ()
 main = loadInitialContext >>= evalExecuteLoop redditCommands (load First)
 
--- | Loads the initial context. Try to get from a history file, or creates a
+-- | Loads the initial context. Try to get from a command line arguments, history file, or creates a
 --   default one
 loadInitialContext :: IO RedditContext
-loadInitialContext = return $ RedditContext Nothing 12 New []
+loadInitialContext = cmdArgsContext =<< defaultContext 
+    where 
+        defaultContext :: IO RedditContext
+        defaultContext = return $ RedditContext Nothing 12 New []
+        cmdArgsContext :: (RedditContext -> IO RedditContext)
+        cmdArgsContext ctx = do
+            (sbrdt, srtng) <- fmap parseArgs getArgs
+            return $ ctx {subreddit = sbrdt, sorting = srtng}
+                where
+                    parseArgs (arg:_)
+                        | null sr = (Nothing, read s)
+                        | otherwise = (Just sr, read s)
+                        where
+                            sr = takeWhile ('/' /=) arg
+                            s  = drop ((length sr) + 1) arg
+                    parseArgs _ = (subreddit ctx, sorting ctx)
 
 instance Read Sorting where
 	readsPrec _ str =
 		case match (map toLower str) of
-			(x:_) -> [(x, "")]
-			_	-> [(Hot, "")]
+			(x:_)   -> [(x, "")]
+			_       -> [(Hot, "")]
 		where
-			values = [("hot", Hot), ("new", New),
+		        values = [("hot", Hot), ("new", New),
 				("top", Top), ("controversial",Controversial)]
 			match :: String -> [Sorting]
 			match value = map snd $ filter (isPrefixOf value . fst) values
