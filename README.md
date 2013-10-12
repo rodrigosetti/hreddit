@@ -4,7 +4,7 @@ A simple [Reddit](http://reddit.com/) command line client.
 
 Usage:
 
-hreddit [<subreddit>]/[new|hot|controversial|top]
+    hreddit [<subreddit>]/[new|hot|controversial|top]
 
 List of commands:
 
