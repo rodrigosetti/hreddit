@@ -20,15 +20,15 @@ import Data.List (isPrefixOf)
 data Sorting = Hot | New | Top | Controversial deriving Show
 
 instance Read Sorting where
-	readsPrec _ str =
-		case match (map toLower str) of
-			(x:_)   -> [(x, "")]
-			_       -> [(Hot, "")]
-		where
-		        values = [("hot", Hot), ("new", New),
-				("top", Top), ("controversial",Controversial)]
-			match :: String -> [Sorting]
-			match value = map snd $ filter (isPrefixOf value . fst) values
+    readsPrec _ str =
+        case match (map toLower str) of
+            (x:_)   -> [(x, "")]
+            _       -> [(Hot, "")]
+      where
+        values = [("hot", Hot), ("new", New),
+            ("top", Top), ("controversial",Controversial)]
+        match :: String -> [Sorting]
+        match value = map snd $ filter (isPrefixOf value . fst) values
 
 -- | Pagination values
 data Page = First | Before String | After String
