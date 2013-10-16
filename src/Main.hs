@@ -60,23 +60,27 @@ loadInitialContext = do
         return $ fromArgs args <|> fromHistory <|> defaultValue
       where
         fromArgs (arg:_)
-          | null (parseArgs arg) = Nothing
-          | otherwise            = Just $ parseArgs arg
+          | null (parseArg arg) = Nothing
+          | otherwise           = Just $ parseArg arg
         fromArgs _      = Nothing
         fromHistory     = Nothing   -- | Not yet implemented
         defaultValue    = Nothing
 
-        parseArgs = takeWhile ('/' /=)
+        parseArg = takeWhile ('/' /=)
 
     getSortingField :: IO Sorting
     getSortingField = do
         args <- getArgs
         return $ fromJust $ fromArgs args <|> fromHistory <|> defaultValue
       where
-        fromArgs (arg:_) = Just $ read $ tail $ dropWhile ('/' /=) arg
+        fromArgs (arg:_)
+          | null (parseArg arg) = Nothing
+          | otherwise           = Just $ read $ tail $ parseArg arg
         fromArgs _       = Nothing
         fromHistory      = Nothing   -- | Not yet implemented
         defaultValue     = Just New
+
+        parseArg = dropWhile ('/' /=)
 
 -- | This function is taken from Network-CGI
 -- http://hackage.haskell.org/package/cgi-3001.1.8.4/docs/src/Network-CGI-Protocol.html#maybeRead
