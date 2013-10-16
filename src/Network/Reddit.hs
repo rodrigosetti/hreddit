@@ -23,7 +23,7 @@ instance Read Sorting where
     readsPrec _ str =
         case match (map toLower str) of
             (x:_)   -> [(x, "")]
-            _       -> [(Hot, "")]
+            _       -> [(New, "")]
       where
         values = [("hot", Hot), ("new", New),
             ("top", Top), ("controversial",Controversial)]
