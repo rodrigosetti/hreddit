@@ -70,4 +70,3 @@ getCommand commands commandName =
 -- | Print information about the command
 printCommandInfo :: Command c -> IO ()
 printCommandInfo cmd = putStrLn $ cmdName cmd ++ ": " ++ description cmd
-

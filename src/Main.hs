@@ -7,7 +7,12 @@ import Network.Reddit
 import System.Console.CommandLoop
 import System.Exit
 import System.Environment (getArgs)
+import System.Info (os)
+import System.Process (readProcessWithExitCode)
+import Text.Read (readMaybe)
 import Control.Applicative ((<|>))
+
+
 
 -- | The application's context state
 data RedditContext = RedditContext { subreddit :: Maybe String,
@@ -40,7 +45,10 @@ redditCommands = [Command 0 "quit"          cmdQuit
                   Command 1 "page"          cmdPageSize
                           "Set or display the current page size",
                   Command 0 "list"          cmdList
-                          "List current page"]
+                          "List current page",
+                  Command 1 "open"          cmdOpen
+                          "Open link ID in default browser"
+                 ]
 
 -- | loads initial context and start the evaluation loop
 main :: IO ()
@@ -127,22 +135,50 @@ cmdSubreddit :: [String] -> CommandAction RedditContext
 cmdSubreddit (x:_) = lift (modify (\c -> c {subreddit = Just x})) >> load First >> cmdList []
 cmdSubreddit [] = lift get >>= liftIO . putStrLn . fromMaybe "<no subreddit>" . subreddit
 
+cmdOpen :: [String] -> CommandAction RedditContext
+cmdOpen (x:_) = case readMaybe x of
+      Nothing -> throwError "specified link ID not valid number"
+      Just x' ->
+       if x' > 0
+         then do
+           c <- lift get
+           if length (links c) >= x'
+             then liftIO $ openBrowserOn $ url $ flip (!!) (x' - 1) $ links c
+             else throwError "link ID too large"
+         else throwError "link ID less than 1"
+cmdOpen _ = throwError "no link ID given to 'open' command"
+
 cmdList :: [String] -> CommandAction RedditContext
 cmdList _ =
     do ctx <- lift get
        let headerDesc = fromMaybe "" (subreddit ctx) ++ "/" ++ show (sorting ctx)
        liftIO $ do putStrLn headerDesc
                    putStrLn $ replicate (length headerDesc) '='
-                   printLinks $ links ctx
+                   printLinks (links ctx) 1 
   where
-    printLinks [] = return ()
-    printLinks (l:ls) = do putStrLn $ title l
-                           putStrLn $ url l
-                           putStrLn ""
-                           printLinks ls
+    printLinks :: [Link] -> Int -> IO ()
+    printLinks [] _ = return ()
+    printLinks (l:ls) i = do putStrLn $ show i ++ ". " ++ title l
+                             putStrLn $ url l
+                             putStrLn ""
+                             printLinks ls (i+1)
 
 load :: Page -> CommandAction RedditContext
 load page = do ctx <- lift get
                liftIO (runErrorT $ listing (subreddit ctx) page (sorting ctx) $ pageSize ctx) >>=
                 either throwError (\(Listing ls) -> lift $ modify $ \c -> c { links = ls })
 
+-- | Attempt to open a web browser on the given url, all platforms.
+openBrowserOn :: String -> IO ()
+openBrowserOn = trybrowsers browsers
+    where
+      trybrowsers [] _ = return () -- unable to open web browser
+      trybrowsers (b:bs) u = do
+        (e,_,_) <- readProcessWithExitCode b [u] ""
+        case e of
+          ExitSuccess -> return ()
+          ExitFailure _ -> trybrowsers bs u
+      browsers | os=="darwin"  = ["open"]
+               | os=="mingw32" = ["c:/Program Files/Mozilla Firefox/firefox.exe","start"] -- needs testing
+               | os=="linux"   = ["xdg-open","google-chrome","firefox"]
+               | otherwise     = []

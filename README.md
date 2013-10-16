@@ -20,4 +20,4 @@ List of commands:
  * `help`: Display help about a command or all commands
  * `page`: Set or display the current page size
  * `list`: List current page
-
+ * `open`: Opens a link in the default web browser
