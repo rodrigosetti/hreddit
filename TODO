@@ -1,5 +1,5 @@
 
- * Command line initialization: [<subreddit>]/[new|hot|controversial|top]
+ * Command line initialization: [<subreddit>]/[new|hot|controversial|top]   [DONE]
  * When changing subreddit, display subreddit information
  * Suggest command if user entered a typo (a la git)
  * Save command history across sessions
