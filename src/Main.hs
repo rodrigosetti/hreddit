@@ -2,10 +2,12 @@ module Main where
 
 import Control.Monad.Error
 import Control.Monad.State
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust, listToMaybe)
 import Network.Reddit
 import System.Console.CommandLoop
 import System.Exit
+import System.Environment (getArgs)
+import Control.Applicative ((<|>))
 
 -- | The application's context state
 data RedditContext = RedditContext { subreddit :: Maybe String,
@@ -44,10 +46,46 @@ redditCommands = [Command 0 "quit"          cmdQuit
 main :: IO ()
 main = loadInitialContext >>= evalExecuteLoop redditCommands (load First)
 
--- | Loads the initial context. Try to get from a history file, or creates a
+-- | Loads the initial context. Try to get either from a command line arguments, or from history file, or creates a
 --   default one
 loadInitialContext :: IO RedditContext
-loadInitialContext = return $ RedditContext Nothing 12 New []
+loadInitialContext = do
+    subreddit'  <- getSubredditField
+    sorting'    <- getSortingField
+    return $ RedditContext subreddit' 12 sorting' []
+  where
+    getSubredditField :: IO (Maybe String)
+    getSubredditField = do
+        args <- getArgs
+        return $ fromArgs args <|> fromHistory <|> defaultValue
+      where
+        fromArgs (arg:_)
+          | null (parseArg arg) = Nothing
+          | otherwise           = Just $ parseArg arg
+        fromArgs _      = Nothing
+        fromHistory     = Nothing   -- | Not yet implemented
+        defaultValue    = Nothing
+
+        parseArg = takeWhile ('/' /=)
+
+    getSortingField :: IO Sorting
+    getSortingField = do
+        args <- getArgs
+        return $ fromJust $ fromArgs args <|> fromHistory <|> defaultValue
+      where
+        fromArgs (arg:_)
+          | null (parseArg arg) = Nothing
+          | otherwise           = Just $ read $ tail $ parseArg arg
+        fromArgs _       = Nothing
+        fromHistory      = Nothing   -- | Not yet implemented
+        defaultValue     = Just New
+
+        parseArg = dropWhile ('/' /=)
+
+-- | This function is taken from Network-CGI
+-- http://hackage.haskell.org/package/cgi-3001.1.8.4/docs/src/Network-CGI-Protocol.html#maybeRead
+maybeRead :: Read a => String -> Maybe a
+maybeRead = fmap fst . listToMaybe . reads
 
 cmdQuit :: [String] -> CommandAction RedditContext
 cmdQuit _ = liftIO exitSuccess
