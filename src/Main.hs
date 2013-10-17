@@ -179,6 +179,7 @@ openBrowserOn = trybrowsers browsers
           ExitSuccess -> return ()
           ExitFailure _ -> trybrowsers bs u
       browsers | os=="darwin"  = ["open"]
-               | os=="mingw32" = ["c:/Program Files/Mozilla Firefox/firefox.exe","start"] -- needs testing
+               | os=="mingw32" = ["start"] -- needs testing
                | os=="linux"   = ["xdg-open","google-chrome","firefox"]
                | otherwise     = []
+
