@@ -8,11 +8,11 @@ import Network.Reddit
 import System.Console.CommandLoop
 import System.Exit
 import System.Environment (getArgs)
+import System.Directory (getHomeDirectory)
 import System.Info (os)
 import System.Process (readProcessWithExitCode)
 import Text.Read (readMaybe)
 import Control.Applicative ((<|>), (<$>))
-
 
 
 -- | The application's context state
@@ -93,7 +93,7 @@ loadInitialContext = do
 
         parseArg = dropWhile ('/' /=)
 
-    getHistoryFile = catch (readFile ".history")
+    getHistoryFile = catch (readFile =<< historyFileLocation)
         ((\_ -> return "") :: IOException -> IO String)
 
 maybeIndex :: Int -> [a] -> Maybe a
@@ -193,5 +193,9 @@ openBrowserOn = trybrowsers browsers
                | otherwise     = []
 
 writeHistoryFile :: RedditContext -> IO ()
-writeHistoryFile ctx = writeFile ".history" $ ((show . subreddit) ctx) ++
+writeHistoryFile ctx = do
+    location <- historyFileLocation
+    writeFile location $ ((show . subreddit) ctx) ++
                             '\n' : ((show . sorting) ctx) ++ "\n"
+historyFileLocation :: IO FilePath
+historyFileLocation = flip (++) "/.reddit_history" `fmap` getHomeDirectory
