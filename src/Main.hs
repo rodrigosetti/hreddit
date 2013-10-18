@@ -198,4 +198,4 @@ writeHistoryFile ctx = do
     writeFile location $ ((show . subreddit) ctx) ++
                             '\n' : ((show . sorting) ctx) ++ "\n"
 historyFileLocation :: IO FilePath
-historyFileLocation = flip (++) "/.reddit_history" `fmap` getHomeDirectory
+historyFileLocation = flip (++) "/.hreddit_history" `fmap` getHomeDirectory
