@@ -2,16 +2,17 @@ module Main where
 
 import Control.Monad.Error
 import Control.Monad.State
-import Data.Maybe (fromMaybe, fromJust, listToMaybe)
+import Control.Exception (catch, IOException)
+import Data.Maybe (fromMaybe, fromJust)
 import Network.Reddit
 import System.Console.CommandLoop
 import System.Exit
 import System.Environment (getArgs)
+import System.Directory (getHomeDirectory)
 import System.Info (os)
 import System.Process (readProcessWithExitCode)
 import Text.Read (readMaybe)
-import Control.Applicative ((<|>))
-
+import Control.Applicative ((<|>), (<$>))
 
 
 -- | The application's context state
@@ -64,39 +65,47 @@ loadInitialContext = do
   where
     getSubredditField :: IO (Maybe String)
     getSubredditField = do
-        args <- getArgs
-        return $ fromArgs args <|> fromHistory <|> defaultValue
+        args    <- getArgs
+        history <- lines <$> getHistoryFile
+        return $ fromArgs args <|> fromHistory history <|> defaultValue
       where
         fromArgs (arg:_)
           | null (parseArg arg) = Nothing
           | otherwise           = Just $ parseArg arg
-        fromArgs _      = Nothing
-        fromHistory     = Nothing   -- | Not yet implemented
-        defaultValue    = Nothing
+        fromArgs _              = Nothing
+        fromHistory             = join . (readMaybe =<<) . maybeIndex 0
+        defaultValue            = Nothing
 
         parseArg = takeWhile ('/' /=)
 
     getSortingField :: IO Sorting
     getSortingField = do
         args <- getArgs
-        return $ fromJust $ fromArgs args <|> fromHistory <|> defaultValue
+        history <- lines <$> getHistoryFile
+        return $ fromJust $ fromArgs args <|> fromHistory history <|> defaultValue
       where
         fromArgs (arg:_)
           | null (parseArg arg) = Nothing
           | otherwise           = Just $ read $ tail $ parseArg arg
-        fromArgs _       = Nothing
-        fromHistory      = Nothing   -- | Not yet implemented
-        defaultValue     = Just New
+        fromArgs _              = Nothing
+        fromHistory             = (read <$>) . maybeIndex 1
+        defaultValue            = Just Hot
 
         parseArg = dropWhile ('/' /=)
 
--- | This function is taken from Network-CGI
--- http://hackage.haskell.org/package/cgi-3001.1.8.4/docs/src/Network-CGI-Protocol.html#maybeRead
-maybeRead :: Read a => String -> Maybe a
-maybeRead = fmap fst . listToMaybe . reads
+    getHistoryFile = catch (readFile =<< historyFileLocation)
+        ((\_ -> return "") :: IOException -> IO String)
+
+maybeIndex :: Int -> [a] -> Maybe a
+maybeIndex i list
+    | (i < length list) && i >= 0 = Just $ list !! i
+    | otherwise = Nothing
+
 
 cmdQuit :: [String] -> CommandAction RedditContext
-cmdQuit _ = liftIO exitSuccess
+cmdQuit _ = do
+    ctx <- get
+    liftIO (writeHistoryFile ctx >> exitSuccess)
 
 cmdNextPage :: [String] -> CommandAction RedditContext
 cmdNextPage _ =
@@ -183,3 +192,10 @@ openBrowserOn = trybrowsers browsers
                | os=="linux"   = ["xdg-open","google-chrome","firefox"]
                | otherwise     = []
 
+writeHistoryFile :: RedditContext -> IO ()
+writeHistoryFile ctx = do
+    location <- historyFileLocation
+    writeFile location $ ((show . subreddit) ctx) ++
+                            '\n' : ((show . sorting) ctx) ++ "\n"
+historyFileLocation :: IO FilePath
+historyFileLocation = flip (++) "/.hreddit_history" `fmap` getHomeDirectory

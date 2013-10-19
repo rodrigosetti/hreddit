@@ -28,5 +28,6 @@ executable hreddit
                      HTTP==4000.2.*,
                      bytestring >=0.9 && < 0.11,
                      aeson==0.6.*,
-                     process >= 1.1.0.0
+                     process >= 1.1.0.0,
+                     directory >=1.0.0.0
 
