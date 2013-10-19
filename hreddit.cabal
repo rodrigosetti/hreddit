@@ -5,7 +5,9 @@ description:         A base simple command line Reddit client
 homepage:            https://github.com/rodrigosetti/hreddit
 license:             MIT
 license-file:        LICENSE
-author:              Rodrigo Setti
+author:              Rodrigo Setti <rodrigosetti@gmail.com>,
+                     Rob Stewart <robstewart57@gmail.com>,
+                     Konstantin Zudov <konstantin@anche.no>
 maintainer:          rodrigosetti@gmail.com
 copyright:           2013 Rodrigo Setti
 category:            Web
