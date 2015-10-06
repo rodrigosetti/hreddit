@@ -5,7 +5,6 @@ module Network.Reddit (Sorting(..),
                        Listing(..),
                        listing) where
 
-import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Error
 import Data.Aeson hiding (Result)
 import Data.ByteString.Lazy hiding (elem, find, map, intersperse, filter, isPrefixOf)

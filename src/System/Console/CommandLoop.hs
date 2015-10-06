@@ -6,41 +6,45 @@ module System.Console.CommandLoop ( CommandAction,
 import Control.Monad.Error
 import Control.Monad.State
 import Data.List (isPrefixOf)
-import System.Console.Readline
+import System.Console.Haskeline
+import System.Console.Haskeline.IO
 
 -- | A command action is a contextualized action that can fail and perform IO,
 --   therefore it's an IO monad wrapped in a State transformer, wrapped in an
 --   Error transformer.
-type CommandAction s = ErrorT String (StateT s IO) ()
+type CommandAction s m = ErrorT String (StateT s m) ()
 
 -- | A command is basically an annotated function with name, description and
 --   the maximum parameters it expects.
-data Command c = Command { argumentNumber :: Int,
-                           cmdName :: String,
-                           function :: [String] -> CommandAction c,
-                           description :: String }
+data Command c m = Command { argumentNumber :: Int,
+                             cmdName :: String,
+                             function :: [String] -> CommandAction c m,
+                             description :: String }
 
 
 -- | The evaluation loop reads a user command and performs it, repeating until
 --   it reads the end of input.
-evalExecuteLoop :: [Command c] -> CommandAction c -> c -> IO ()
+evalExecuteLoop :: [Command c IO] -> CommandAction c IO -> c -> IO ()
 evalExecuteLoop commands start =
-    evalStateT $ runErrorT start >> loop
+    evalStateT $ do _ <- runErrorT start
+                    is <- liftIO $ initializeInput defaultSettings
+                    loop is
+                    liftIO $ closeInput is
   where
-    loop = do
-        maybeCommand <- liftIO $ readline "> "
+    loop is = do
+        maybeCommand <- liftIO $ queryInput is $ getInputLine "> "
         case maybeCommand of
             Nothing -> return ()
-            Just "" -> loop
+            Just "" -> loop is
             Just command -> let ws = words command in
-                             runErrorT (performCommand commands (head ws) $ tail ws) >>=
-                             liftIO . either (putStrLn . (++) "ERROR: ") (\_ -> addHistory command) >>
-                             loop
+                             do r <- runErrorT (performCommand commands (head ws) $ tail ws)
+                                liftIO $ either (putStrLn . (++) "ERROR: ") (void . return) r
+                                loop is
 
 -- | Select the command to run from the available ones. Smartly selects the
 --   unique prefix, if exist, and show errors and warnings if the command does
 --   not exist, is ambiguous or the argument number is more than necessary.
-performCommand :: [Command c] -> String -> [String] -> ErrorT String (StateT c IO) ()
+performCommand :: MonadIO m => [Command c m] -> String -> [String] -> ErrorT String (StateT c m) ()
 performCommand commands commandName args =
     do command <- getCommand commands commandName
        let argNum = argumentNumber command
@@ -49,7 +53,7 @@ performCommand commands commandName args =
        function command args
 
 -- | Displays help information about a single command or all commands
-cmdHelp :: [Command c] -> [String] -> CommandAction c
+cmdHelp :: MonadIO m => [Command c m] -> [String] -> CommandAction c m
 cmdHelp commands (commandName:_) = 
     do command <- getCommand commands commandName
        liftIO $ printCommandInfo command
@@ -58,7 +62,7 @@ cmdHelp commands [] = liftIO $ forM_ commands printCommandInfo
 
 -- | get the matched command, or return Nothing - displaying error
 --   if the command is ambiguous or unknown
-getCommand :: [Command c] -> String -> ErrorT String (StateT c IO) (Command c)
+getCommand :: MonadIO m => [Command c m] -> String -> ErrorT String (StateT c m) (Command c m)
 getCommand commands commandName = 
     case length cmds of
         0 -> throwError $ "unknown command \"" ++ commandName ++ "\"."
@@ -68,5 +72,6 @@ getCommand commands commandName =
     cmds = filter (isPrefixOf commandName . cmdName) commands
 
 -- | Print information about the command
-printCommandInfo :: Command c -> IO ()
+printCommandInfo :: Command c m -> IO ()
 printCommandInfo cmd = putStrLn $ cmdName cmd ++ ": " ++ description cmd
+

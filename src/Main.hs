@@ -12,7 +12,7 @@ import System.Directory (getHomeDirectory)
 import System.Info (os)
 import System.Process (readProcessWithExitCode)
 import Text.Read (readMaybe)
-import Control.Applicative ((<|>), (<$>))
+import Control.Applicative ((<|>))
 
 
 -- | The application's context state
@@ -22,7 +22,7 @@ data RedditContext = RedditContext { subreddit :: Maybe String,
                                      links     :: [Link] }
 
 -- | The full list of commands available for the user
-redditCommands :: [Command RedditContext]
+redditCommands :: [Command RedditContext IO]
 redditCommands = [Command 0 "quit"          cmdQuit
                           "Exit the program",
                   Command 0 "next"          cmdNextPage
@@ -102,49 +102,49 @@ maybeIndex i list
     | otherwise = Nothing
 
 
-cmdQuit :: [String] -> CommandAction RedditContext
+cmdQuit :: [String] -> CommandAction RedditContext IO
 cmdQuit _ = do
     ctx <- get
     liftIO (writeHistoryFile ctx >> exitSuccess)
 
-cmdNextPage :: [String] -> CommandAction RedditContext
+cmdNextPage :: [String] -> CommandAction RedditContext IO
 cmdNextPage _ =
     lift get >>= loadNext . links >> cmdList []
   where
     loadNext [] = throwError "could not go to next page from empty page"
     loadNext l = load $ After $ name $ last l
 
-cmdPreviousPage :: [String] -> CommandAction RedditContext
+cmdPreviousPage :: [String] -> CommandAction RedditContext IO
 cmdPreviousPage _ =
     lift get >>= loadPrev . links >> cmdList []
   where
     loadPrev [] = throwError "could not go to previous page from empty page"
     loadPrev (x:_) = load $ Before $ name x
 
-cmdFirstPage :: [String] -> CommandAction RedditContext
+cmdFirstPage :: [String] -> CommandAction RedditContext IO
 cmdFirstPage _ = load First >> cmdList []
 
-cmdSortingHot :: [String] -> CommandAction RedditContext
+cmdSortingHot :: [String] -> CommandAction RedditContext IO
 cmdSortingHot _ = lift (modify (\c -> c {sorting = Hot})) >> load First >> cmdList []
 
-cmdSortingNew :: [String] -> CommandAction RedditContext
+cmdSortingNew :: [String] -> CommandAction RedditContext IO
 cmdSortingNew _ = lift (modify (\c -> c {sorting = New})) >> load First >> cmdList []
 
-cmdSortingTop :: [String] -> CommandAction RedditContext
+cmdSortingTop :: [String] -> CommandAction RedditContext IO
 cmdSortingTop _ = lift (modify (\c -> c {sorting = Top})) >> load First >> cmdList []
 
-cmdSortingControversial :: [String] -> CommandAction RedditContext
+cmdSortingControversial :: [String] -> CommandAction RedditContext IO
 cmdSortingControversial _ = lift (modify (\c -> c {sorting = Controversial})) >> load First >> cmdList []
 
-cmdPageSize :: [String] -> CommandAction RedditContext
+cmdPageSize :: [String] -> CommandAction RedditContext IO
 cmdPageSize (x:_) = lift (modify (\c -> c {pageSize = read x}))
 cmdPageSize [] = lift get >>= liftIO . print . pageSize
 
-cmdSubreddit :: [String] -> CommandAction RedditContext
+cmdSubreddit :: [String] -> CommandAction RedditContext IO
 cmdSubreddit (x:_) = lift (modify (\c -> c {subreddit = Just x})) >> load First >> cmdList []
 cmdSubreddit [] = lift get >>= liftIO . putStrLn . fromMaybe "<no subreddit>" . subreddit
 
-cmdOpen :: [String] -> CommandAction RedditContext
+cmdOpen :: [String] -> CommandAction RedditContext IO
 cmdOpen (x:_) = case readMaybe x of
       Nothing -> throwError "specified link ID not valid number"
       Just x' ->
@@ -157,7 +157,7 @@ cmdOpen (x:_) = case readMaybe x of
          else throwError "link ID less than 1"
 cmdOpen _ = throwError "no link ID given to 'open' command"
 
-cmdList :: [String] -> CommandAction RedditContext
+cmdList :: [String] -> CommandAction RedditContext IO
 cmdList _ =
     do ctx <- lift get
        let headerDesc = fromMaybe "" (subreddit ctx) ++ "/" ++ show (sorting ctx)
@@ -172,7 +172,7 @@ cmdList _ =
                              putStrLn ""
                              printLinks ls (i+1)
 
-load :: Page -> CommandAction RedditContext
+load :: Page -> CommandAction RedditContext IO
 load page = do ctx <- lift get
                liftIO (runErrorT $ listing (subreddit ctx) page (sorting ctx) $ pageSize ctx) >>=
                 either throwError (\(Listing ls) -> lift $ modify $ \c -> c { links = ls })

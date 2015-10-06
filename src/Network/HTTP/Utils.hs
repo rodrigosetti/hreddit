@@ -7,7 +7,6 @@ import Control.Monad.Error
 import Data.Aeson hiding (Result)
 import Data.ByteString.Lazy hiding (elem, find, map, intersperse)
 import Data.List (find, intersperse)
-import Data.Monoid (mconcat)
 import Network.HTTP
 import Network.Stream
 import Network.URI
