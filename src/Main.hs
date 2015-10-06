@@ -195,7 +195,7 @@ openBrowserOn = trybrowsers browsers
 writeHistoryFile :: RedditContext -> IO ()
 writeHistoryFile ctx = do
     location <- historyFileLocation
-    writeFile location $ ((show . subreddit) ctx) ++
-                            '\n' : ((show . sorting) ctx) ++ "\n"
+    writeFile location $ (show . subreddit) ctx ++
+                            '\n' : (show . sorting) ctx ++ "\n"
 historyFileLocation :: IO FilePath
 historyFileLocation = flip (++) "/.hreddit_history" `fmap` getHomeDirectory

@@ -8,6 +8,7 @@ import Control.Monad.State
 import Data.List (isPrefixOf)
 import System.Console.Haskeline
 import System.Console.Haskeline.IO
+import System.Console.Haskeline.Completion
 
 -- | A command action is a contextualized action that can fail and perform IO,
 --   therefore it's an IO monad wrapped in a State transformer, wrapped in an
@@ -27,10 +28,12 @@ data Command c m = Command { argumentNumber :: Int,
 evalExecuteLoop :: [Command c IO] -> CommandAction c IO -> c -> IO ()
 evalExecuteLoop commands start =
     evalStateT $ do _ <- runErrorT start
-                    is <- liftIO $ initializeInput defaultSettings
+                    is <- liftIO $ initializeInput settings
                     loop is
                     liftIO $ closeInput is
   where
+    settings = Settings completionFunc Nothing True
+    completionFunc = completeWord Nothing [] $ \w -> return $ map simpleCompletion $ filter (isPrefixOf w) (map cmdName commands)
     loop is = do
         maybeCommand <- liftIO $ queryInput is $ getInputLine "> "
         case maybeCommand of

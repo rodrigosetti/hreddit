@@ -26,7 +26,7 @@ executable hreddit
                     network-uri == 2.6.*,
                     HTTP        == 4000.2.*,
                     bytestring  == 0.10.*,
-                    aeson       == 0.10.*,
-                    process     == 1.3.*,
+                    aeson       == 0.9.*,
+                    process     == 1.2.*,
                     directory   == 1.2.*
 
