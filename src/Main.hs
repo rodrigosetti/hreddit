@@ -1,18 +1,21 @@
 module Main where
 
-import Control.Monad.Error
-import Control.Monad.State
+import Control.Applicative ((<|>))
 import Control.Exception (catch, IOException)
+import Control.Monad (join)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State
 import Data.Maybe (fromMaybe, fromJust)
 import Network.Reddit
 import System.Console.CommandLoop
-import System.Exit
-import System.Environment (getArgs)
 import System.Directory (getHomeDirectory)
+import System.Environment (getArgs)
+import System.Exit
 import System.Info (os)
 import System.Process (readProcessWithExitCode)
 import Text.Read (readMaybe)
-import Control.Applicative ((<|>))
 
 
 -- | The application's context state
@@ -104,21 +107,21 @@ maybeIndex i list
 
 cmdQuit :: [String] -> CommandAction RedditContext IO
 cmdQuit _ = do
-    ctx <- get
+    ctx <- lift get
     liftIO (writeHistoryFile ctx >> exitSuccess)
 
 cmdNextPage :: [String] -> CommandAction RedditContext IO
 cmdNextPage _ =
     lift get >>= loadNext . links >> cmdList []
   where
-    loadNext [] = throwError "could not go to next page from empty page"
+    loadNext [] = throwE "could not go to next page from empty page"
     loadNext l = load $ After $ name $ last l
 
 cmdPreviousPage :: [String] -> CommandAction RedditContext IO
 cmdPreviousPage _ =
     lift get >>= loadPrev . links >> cmdList []
   where
-    loadPrev [] = throwError "could not go to previous page from empty page"
+    loadPrev [] = throwE "could not go to previous page from empty page"
     loadPrev (x:_) = load $ Before $ name x
 
 cmdFirstPage :: [String] -> CommandAction RedditContext IO
@@ -146,16 +149,16 @@ cmdSubreddit [] = lift get >>= liftIO . putStrLn . fromMaybe "<no subreddit>" . 
 
 cmdOpen :: [String] -> CommandAction RedditContext IO
 cmdOpen (x:_) = case readMaybe x of
-      Nothing -> throwError "specified link ID not valid number"
+      Nothing -> throwE "specified link ID not valid number"
       Just x' ->
        if x' > 0
          then do
            c <- lift get
            if length (links c) >= x'
              then liftIO $ openBrowserOn $ url $ flip (!!) (x' - 1) $ links c
-             else throwError "link ID too large"
-         else throwError "link ID less than 1"
-cmdOpen _ = throwError "no link ID given to 'open' command"
+             else throwE "link ID too large"
+         else throwE "link ID less than 1"
+cmdOpen _ = throwE "no link ID given to 'open' command"
 
 cmdList :: [String] -> CommandAction RedditContext IO
 cmdList _ =
@@ -174,8 +177,8 @@ cmdList _ =
 
 load :: Page -> CommandAction RedditContext IO
 load page = do ctx <- lift get
-               liftIO (runErrorT $ listing (subreddit ctx) page (sorting ctx) $ pageSize ctx) >>=
-                either throwError (\(Listing ls) -> lift $ modify $ \c -> c { links = ls })
+               liftIO (runExceptT $ listing (subreddit ctx) page (sorting ctx) $ pageSize ctx) >>=
+                either throwE (\(Listing ls) -> lift $ modify $ \c -> c { links = ls })
 
 -- | Attempt to open a web browser on the given url, all platforms.
 openBrowserOn :: String -> IO ()

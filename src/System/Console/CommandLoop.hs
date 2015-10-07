@@ -3,17 +3,18 @@ module System.Console.CommandLoop ( CommandAction,
                                     evalExecuteLoop,
                                     cmdHelp ) where
 
-import Control.Monad.Error
-import Control.Monad.State
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State
+import Control.Monad.IO.Class
+import Control.Monad
 import Data.List (isPrefixOf)
 import System.Console.Haskeline
 import System.Console.Haskeline.IO
-import System.Console.Haskeline.Completion
 
 -- | A command action is a contextualized action that can fail and perform IO,
 --   therefore it's an IO monad wrapped in a State transformer, wrapped in an
 --   Error transformer.
-type CommandAction s m = ErrorT String (StateT s m) ()
+type CommandAction s m = ExceptT String (StateT s m) ()
 
 -- | A command is basically an annotated function with name, description and
 --   the maximum parameters it expects.
@@ -27,7 +28,7 @@ data Command c m = Command { argumentNumber :: Int,
 --   it reads the end of input.
 evalExecuteLoop :: [Command c IO] -> CommandAction c IO -> c -> IO ()
 evalExecuteLoop commands start =
-    evalStateT $ do _ <- runErrorT start
+    evalStateT $ do _ <- runExceptT start
                     is <- liftIO $ initializeInput settings
                     loop is
                     liftIO $ closeInput is
@@ -40,14 +41,14 @@ evalExecuteLoop commands start =
             Nothing -> return ()
             Just "" -> loop is
             Just command -> let ws = words command in
-                             do r <- runErrorT (performCommand commands (head ws) $ tail ws)
+                             do r <- runExceptT (performCommand commands (head ws) $ tail ws)
                                 liftIO $ either (putStrLn . (++) "ERROR: ") (void . return) r
                                 loop is
 
 -- | Select the command to run from the available ones. Smartly selects the
 --   unique prefix, if exist, and show errors and warnings if the command does
 --   not exist, is ambiguous or the argument number is more than necessary.
-performCommand :: MonadIO m => [Command c m] -> String -> [String] -> ErrorT String (StateT c m) ()
+performCommand :: MonadIO m => [Command c m] -> String -> [String] -> ExceptT String (StateT c m) ()
 performCommand commands commandName args =
     do command <- getCommand commands commandName
        let argNum = argumentNumber command
@@ -65,12 +66,12 @@ cmdHelp commands [] = liftIO $ forM_ commands printCommandInfo
 
 -- | get the matched command, or return Nothing - displaying error
 --   if the command is ambiguous or unknown
-getCommand :: MonadIO m => [Command c m] -> String -> ErrorT String (StateT c m) (Command c m)
+getCommand :: MonadIO m => [Command c m] -> String -> ExceptT String (StateT c m) (Command c m)
 getCommand commands commandName = 
     case length cmds of
-        0 -> throwError $ "unknown command \"" ++ commandName ++ "\"."
+        0 -> throwE $ "unknown command \"" ++ commandName ++ "\"."
         1 -> return $ head cmds
-        _ -> throwError $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
+        _ -> throwE $ "\"" ++ commandName ++ "\" is ambiguous. Did you mean?: " ++ unwords (map cmdName cmds)
   where
     cmds = filter (isPrefixOf commandName . cmdName) commands
 

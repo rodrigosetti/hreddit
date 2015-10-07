@@ -5,7 +5,7 @@ module Network.Reddit (Sorting(..),
                        Listing(..),
                        listing) where
 
-import Control.Monad.Error
+import Control.Monad.Trans.Except
 import Data.Aeson hiding (Result)
 import Data.ByteString.Lazy hiding (elem, find, map, intersperse, filter, isPrefixOf)
 import Network.HTTP
@@ -44,14 +44,14 @@ instance FromJSON Link where
                                    <*> d .: "name"
                                    <*> d .: "title"
                                    <*> d .: "url"
-    parseJSON _          = mzero
+    parseJSON _          = mempty
 
 data Listing = Listing [Link] deriving Show
 
 instance FromJSON Listing where
     parseJSON (Object o) = do d <- o .: "data"
                               Listing <$> d .: "children"
-    parseJSON _          = mzero
+    parseJSON _          = mempty
 
 
 -- | A (internal) Reddit API request constructor
@@ -70,7 +70,7 @@ request method requestPath queryString =
               ""
 
 -- | Get a page of Reddit listing
-listing :: Maybe String -> Page -> Sorting -> Int -> ErrorT String IO Listing
+listing :: Maybe String -> Page -> Sorting -> Int -> ExceptT String IO Listing
 listing maybeSubreddit page sorting limit =
     jsonAPICall $ request GET (subreddit ++ sortingString ++ ".json") $
                        makeQuery $ ("limit", show $ restrict 0 100 limit):otherQueryParams

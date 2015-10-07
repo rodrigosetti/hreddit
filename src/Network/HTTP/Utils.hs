@@ -3,7 +3,8 @@ module Network.HTTP.Utils (isRedirect,
                            jsonAPICall,
                            makeQuery) where
 
-import Control.Monad.Error
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except
 import Data.Aeson hiding (Result)
 import Data.ByteString.Lazy hiding (elem, find, map, intersperse)
 import Data.List (find, intersperse)
@@ -28,14 +29,14 @@ simpleHttpFollowingRedirects c req =
                             (\u -> simpleHttpFollowingRedirects (c-1) req {rqURI = u}) $
                             find ((== HdrLocation) . hdrName) (rspHeaders r) >>= parseURI . hdrValue
 
-jsonAPICall :: FromJSON a => Request ByteString -> ErrorT String IO a
+jsonAPICall :: FromJSON a => Request ByteString -> ExceptT String IO a
 jsonAPICall req = do eitherResult <- liftIO $ simpleHttpFollowingRedirects 10 req
                      case eitherResult of
-                        Left ErrorReset -> throwError "connection reset"
-                        Left ErrorClosed -> throwError "connection closed"
-                        Left (ErrorParse s) -> throwError $ "HTTP parsing: " ++ s
-                        Left (ErrorMisc s) -> throwError s
-                        Right r -> maybe (throwError "invalid response from server") return $ decode $ rspBody r
+                        Left ErrorReset -> throwE "connection reset"
+                        Left ErrorClosed -> throwE "connection closed"
+                        Left (ErrorParse s) -> throwE $ "HTTP parsing: " ++ s
+                        Left (ErrorMisc s) -> throwE s
+                        Right r -> maybe (throwE "invalid response from server") return $ decode $ rspBody r
 
 makeQuery :: [(String, String)] -> String
 makeQuery = ('?':) . mconcat . intersperse "&" . map (\(a, b) -> a ++ "=" ++ b)
