@@ -26,11 +26,12 @@ data Command c m = Command { argumentNumber :: Int,
 
 -- | The evaluation loop reads a user command and performs it, repeating until
 --   it reads the end of input.
-evalExecuteLoop :: [Command c IO] -> CommandAction c IO -> c -> IO ()
-evalExecuteLoop commands start =
+evalExecuteLoop :: [Command c IO] -> CommandAction c IO -> CommandAction c IO -> c -> IO ()
+evalExecuteLoop commands start end =
     evalStateT $ do _ <- runExceptT start
                     is <- liftIO $ initializeInput settings
                     loop is
+                    _ <- runExceptT end
                     liftIO $ closeInput is
   where
     settings = Settings completionFunc Nothing True

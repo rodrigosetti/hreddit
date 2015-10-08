@@ -56,9 +56,9 @@ redditCommands = [Command 0 "quit"          cmdQuit
 
 -- | loads initial context and start the evaluation loop
 main :: IO ()
-main = loadInitialContext >>= evalExecuteLoop redditCommands (load First)
+main = loadInitialContext >>= evalExecuteLoop redditCommands (load First) (cmdQuit [])
 
--- | Loads the initial context. Try to get either from a command line arguments, or from history file, or creates a
+-- | Loads the initial context. Try to get either from a command line arguments, or from preferences file, or creates a
 --   default one
 loadInitialContext :: IO RedditContext
 loadInitialContext = do
@@ -68,15 +68,15 @@ loadInitialContext = do
   where
     getSubredditField :: IO (Maybe String)
     getSubredditField = do
-        args    <- getArgs
-        history <- lines <$> getHistoryFile
-        return $ fromArgs args <|> fromHistory history <|> defaultValue
+        args        <- getArgs
+        preferences <- lines <$> getPreferencesFile
+        return $ fromArgs args <|> fromPreferences preferences <|> defaultValue
       where
         fromArgs (arg:_)
           | null (parseArg arg) = Nothing
           | otherwise           = Just $ parseArg arg
         fromArgs _              = Nothing
-        fromHistory             = join . (readMaybe =<<) . maybeIndex 0
+        fromPreferences         = join . (readMaybe =<<) . maybeIndex 0
         defaultValue            = Nothing
 
         parseArg = takeWhile ('/' /=)
@@ -84,19 +84,19 @@ loadInitialContext = do
     getSortingField :: IO Sorting
     getSortingField = do
         args <- getArgs
-        history <- lines <$> getHistoryFile
-        return $ fromJust $ fromArgs args <|> fromHistory history <|> defaultValue
+        preferences <- lines <$> getPreferencesFile
+        return $ fromJust $ fromArgs args <|> fromPreferences preferences <|> defaultValue
       where
         fromArgs (arg:_)
           | null (parseArg arg) = Nothing
           | otherwise           = Just $ read $ tail $ parseArg arg
         fromArgs _              = Nothing
-        fromHistory             = (read <$>) . maybeIndex 1
+        fromPreferences         = (read <$>) . maybeIndex 1
         defaultValue            = Just Hot
 
         parseArg = dropWhile ('/' /=)
 
-    getHistoryFile = catch (readFile =<< historyFileLocation)
+    getPreferencesFile = catch (readFile =<< preferencesFileLocation)
         ((\_ -> return "") :: IOException -> IO String)
 
 maybeIndex :: Int -> [a] -> Maybe a
@@ -108,7 +108,7 @@ maybeIndex i list
 cmdQuit :: [String] -> CommandAction RedditContext IO
 cmdQuit _ = do
     ctx <- lift get
-    liftIO (writeHistoryFile ctx >> exitSuccess)
+    liftIO (writePreferencesFile ctx >> exitSuccess)
 
 cmdNextPage :: [String] -> CommandAction RedditContext IO
 cmdNextPage _ =
@@ -195,10 +195,12 @@ openBrowserOn = trybrowsers browsers
                | os=="linux"   = ["xdg-open","google-chrome","firefox"]
                | otherwise     = []
 
-writeHistoryFile :: RedditContext -> IO ()
-writeHistoryFile ctx = do
-    location <- historyFileLocation
+writePreferencesFile :: RedditContext -> IO ()
+writePreferencesFile ctx = do
+    location <- preferencesFileLocation
     writeFile location $ (show . subreddit) ctx ++
                             '\n' : (show . sorting) ctx ++ "\n"
-historyFileLocation :: IO FilePath
-historyFileLocation = flip (++) "/.hreddit_history" `fmap` getHomeDirectory
+
+preferencesFileLocation :: IO FilePath
+preferencesFileLocation = flip (++) "/.hreddit.preferences" `fmap` getHomeDirectory
+
